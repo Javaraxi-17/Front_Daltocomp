@@ -125,6 +125,15 @@ export default function CameraToolScreen() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity 
+          style={[styles.colorDetectionButton, { backgroundColor: colors.secondary || '#6B73FF' }]} 
+          onPress={() => navigation.navigate('ColorDetection' as never)}
+        >
+          <Text style={styles.colorDetectionButtonText}>
+            🎨 Detectar Colores
+          </Text>
+        </TouchableOpacity>
+
         <View style={styles.bottomControls}>
           <TouchableOpacity 
             style={[styles.secondaryButton, { borderColor: colors.inputBorder }]} 
@@ -180,11 +189,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
   },
+  colorDetectionButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
   captureButtonText: { 
     color: '#fff', 
     fontWeight: '800', 
     textAlign: 'center',
     fontSize: 18,
+  },
+  colorDetectionButtonText: {
+    color: '#fff',
+    fontWeight: '800',
+    textAlign: 'center',
+    fontSize: 16,
   },
   bottomControls: { 
     flexDirection: 'row', 
