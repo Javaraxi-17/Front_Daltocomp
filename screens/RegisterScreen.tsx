@@ -13,14 +13,30 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres';
+    }
+    
+    if (!/\d/.test(password)) {
+      return 'La contraseña debe contener al menos un número';
+    }
+    
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return 'La contraseña debe contener al menos un carácter especial';
+    }
+    
+    return null;
+  };
+
   const onRegister = useCallback(async () => {
     if (!name.trim() || !email.trim() || !username.trim() || !password.trim()) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+    if (username.length < 3) {
+      Alert.alert('Error', 'El usuario debe tener al menos 3 caracteres');
       return;
     }
 
@@ -29,12 +45,39 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Validar contraseña
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      Alert.alert('Error de contraseña', passwordError);
+      return;
+    }
+
     try {
       await register(name.trim(), email.trim(), username.trim(), password);
-      // Navegar directamente a D15Test sin alerta
+      // Solo navegar si el registro fue exitoso
       navigation.navigate('D15Test' as never);
     } catch (error: any) {
-      Alert.alert('Error de registro', error.message || 'No se pudo crear la cuenta');
+      // Manejar errores específicos del backend
+      let errorMessage = 'No se pudo crear la cuenta';
+      
+      if (error.code === 'EMAIL_EXISTS') {
+        errorMessage = 'El correo electrónico ya está registrado';
+      } else if (error.code === 'USERNAME_EXISTS') {
+        errorMessage = 'El nombre de usuario ya existe';
+      } else if (error.code === 'VALIDATION_ERROR') {
+        errorMessage = error.message || 'Datos de registro inválidos';
+      } else if (error.code === 'WEAK_PASSWORD') {
+        errorMessage = 'La contraseña es muy débil';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión a internet';
+      } else if (error.code === 'SERVICE_UNAVAILABLE') {
+        errorMessage = 'El servicio no está disponible. Intenta más tarde';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error de registro', errorMessage);
+      // NO navegar en caso de error - quedarse en la pantalla de registro
     }
   }, [name, email, username, password, register, navigation]);
 
@@ -87,6 +130,25 @@ export default function RegisterScreen() {
           onChangeText={setPassword}
           secureTextEntry
         />
+        
+        {/* Indicadores de requisitos de contraseña */}
+        <View style={styles.passwordRequirements}>
+          <Text style={[styles.requirementText, { 
+            color: password.length >= 8 ? colors.success || '#4CAF50' : colors.mutedText 
+          }]}>
+            ✓ Al menos 8 caracteres
+          </Text>
+          <Text style={[styles.requirementText, { 
+            color: /\d/.test(password) ? colors.success || '#4CAF50' : colors.mutedText 
+          }]}>
+            ✓ Al menos un número
+          </Text>
+          <Text style={[styles.requirementText, { 
+            color: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? colors.success || '#4CAF50' : colors.mutedText 
+          }]}>
+            ✓ Al menos un carácter especial
+          </Text>
+        </View>
 
         <TouchableOpacity 
           style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: isLoading ? 0.6 : 1 }]} 
@@ -157,5 +219,13 @@ const styles = StyleSheet.create({
   },
   link: {
     fontWeight: '600',
+  },
+  passwordRequirements: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  requirementText: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });

@@ -13,6 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   clearNewUserFlag: () => void;
+  updateUser: (userData: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -101,9 +102,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await storeAuth(response.idToken, userData);
       
       console.log('🎉 Login completado exitosamente');
-    } catch (error) {
+      // NO navegar automáticamente aquí - dejar que las pantallas manejen la navegación
+    } catch (error: any) {
       console.error('❌ Login error:', error);
-      throw error;
+      
+      // Limpiar estado de autenticación en caso de error
+      setToken(null);
+      setUser(null);
+      setIsNewUser(false);
+      
+      // Preservar el error con su código para que las pantallas puedan manejarlo
+      const authError = new Error(error.message || 'Error de autenticación');
+      (authError as any).code = error.code;
+      (authError as any).status = error.status;
+      throw authError;
     } finally {
       setIsLoading(false);
     }
@@ -113,27 +125,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       setIsLoading(true);
       
-      console.log('Iniciando registro...');
+      console.log('📝 Iniciando registro...');
       
       // Registrar usuario
       const registerResponse = await apiService.register({ name, email, username, password });
-      console.log('Usuario registrado:', registerResponse);
+      console.log('✅ Usuario registrado:', registerResponse);
       
       // Esperar un momento para que Firebase procese el usuario
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Hacer login para obtener el token
-      console.log('Iniciando login...');
+      console.log('🔐 Iniciando login...');
       const loginResponse = await apiService.login({ email, password });
-      console.log('Login exitoso, configurando token...');
+      console.log('✅ Login exitoso, configurando token...');
       
       // Configurar token en el servicio API
       apiService.setToken(loginResponse.idToken);
       
       // Obtener datos completos del usuario
-      console.log('Obteniendo datos del usuario...');
+      console.log('👤 Obteniendo datos del usuario...');
       const userData = await apiService.getCurrentUser();
-      console.log('Datos del usuario obtenidos:', userData);
+      console.log('✅ Datos del usuario obtenidos:', userData);
       
       // Configurar autenticación
       setToken(loginResponse.idToken);
@@ -141,11 +153,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsNewUser(true); // Es usuario nuevo en registro
       await storeAuth(loginResponse.idToken, userData);
       
-      console.log('Registro completado exitosamente');
+      console.log('🎉 Registro completado exitosamente');
+      // NO navegar automáticamente aquí - dejar que las pantallas manejen la navegación
       
-    } catch (error) {
-      console.error('Register error:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ Register error:', error);
+      
+      // Limpiar estado de autenticación en caso de error
+      setToken(null);
+      setUser(null);
+      setIsNewUser(false);
+      
+      // Preservar el error con su código para que las pantallas puedan manejarlo
+      const authError = new Error(error.message || 'Error de registro');
+      (authError as any).code = error.code;
+      (authError as any).status = error.status;
+      throw authError;
     } finally {
       setIsLoading(false);
     }
@@ -184,6 +207,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsNewUser(false);
   };
 
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -195,6 +223,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
     refreshAuth,
     clearNewUserFlag,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -35,6 +35,86 @@ export interface User {
   updatedAt: string;
 }
 
+export interface ColorDetectionData {
+  colorName: string;
+  colorCategory: string;
+  rgb: [number, number, number];
+  hex: string;
+  hsl: [number, number, number];
+  confidence: number;
+  palette?: Array<{
+    name: string;
+    category: string;
+    rgb: [number, number, number];
+    percentage: number;
+  }>;
+}
+
+export interface RecommendationData {
+  colorName: string;
+  colorCategory: string;
+  recommendations: Array<{
+    strategy: string;
+    description: string;
+    tips: string[];
+  }>;
+}
+
+export interface SaveDetectionResponse {
+  success: boolean;
+  detectionId: string;
+  message: string;
+}
+
+export interface SaveRecommendationsResponse {
+  success: boolean;
+  recommendationId: string;
+  message: string;
+}
+
+export interface ColorHistoryResponse {
+  success: boolean;
+  colorHistory: Array<{
+    id: string;
+    userId: string;
+    colorName: string;
+    colorCategory: string;
+    rgb: [number, number, number];
+    hex: string;
+    hsl: [number, number, number];
+    confidence: number;
+    palette: Array<{
+      name: string;
+      category: string;
+      rgb: [number, number, number];
+      percentage: number;
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  total: number;
+  message: string;
+}
+
+export interface RecommendationHistoryResponse {
+  success: boolean;
+  recommendationHistory: Array<{
+    id: string;
+    userId: string;
+    colorName: string;
+    colorCategory: string;
+    recommendations: Array<{
+      strategy: string;
+      description: string;
+      tips: string[];
+    }>;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  total: number;
+  message: string;
+}
+
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
@@ -53,21 +133,16 @@ class ApiService {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string> || {}),
     };
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    console.log(`API Request: ${options.method || 'GET'} ${url}`);
-    if (this.token) {
-      console.log('Token presente:', this.token.substring(0, 20) + '...');
-    } else {
-      console.log('Sin token');
-    }
+    console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
 
     try {
       const response = await fetch(url, {
@@ -75,17 +150,35 @@ class ApiService {
         headers,
       });
 
-      console.log(`API Response: ${response.status} ${response.statusText}`);
+      console.log(`📡 API Response: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('API Error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        console.error('❌ API Error:', errorData);
+        
+        // Crear un error personalizado que preserve el código y mensaje del backend
+        const error = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        (error as any).code = errorData.code;
+        (error as any).status = response.status;
+        (error as any).details = errorData.details;
+        throw error;
       }
 
-      return response.json();
-    } catch (error) {
-      console.error('Network error:', error);
+      const data = await response.json();
+      console.log('✅ API Success:', data);
+      return data;
+    } catch (error: any) {
+      console.error('🚨 Network/API error:', error);
+      
+      // Si es un error de red, envolver con información específica
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        const networkError = new Error('No se pudo conectar con el servidor');
+        (networkError as any).code = 'NETWORK_ERROR';
+        (networkError as any).status = 0;
+        throw networkError;
+      }
+      
+      // Re-lanzar el error con su información original
       throw error;
     }
   }
@@ -137,6 +230,46 @@ class ApiService {
 
   async deleteUser(): Promise<{ ok: boolean }> {
     return this.request<{ ok: boolean }>('/users/me', {
+      method: 'DELETE',
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
+    return this.request<{ ok: boolean; message: string }>('/users/me/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  // Color detection endpoints
+  async saveColorDetection(data: ColorDetectionData): Promise<SaveDetectionResponse> {
+    return this.request<SaveDetectionResponse>('/color-detection/save-detection', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async saveRecommendations(data: RecommendationData): Promise<SaveRecommendationsResponse> {
+    return this.request<SaveRecommendationsResponse>('/color-detection/save-recommendations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getColorDetectionHistory(limit: number = 20, offset: number = 0): Promise<ColorHistoryResponse> {
+    return this.request<ColorHistoryResponse>(`/color-detection/history?limit=${limit}&offset=${offset}`);
+  }
+
+  async getRecommendationHistory(limit: number = 20, offset: number = 0): Promise<RecommendationHistoryResponse> {
+    return this.request<RecommendationHistoryResponse>(`/color-detection/recommendations/history?limit=${limit}&offset=${offset}`);
+  }
+
+  async getColorDetectionById(id: string): Promise<{ success: boolean; detection: any; message: string }> {
+    return this.request<{ success: boolean; detection: any; message: string }>(`/color-detection/detection/${id}`);
+  }
+
+  async deleteColorDetection(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/color-detection/detection/${id}`, {
       method: 'DELETE',
     });
   }

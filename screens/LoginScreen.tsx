@@ -19,9 +19,30 @@ export default function LoginScreen() {
 
     try {
       await login(emailOrUser.trim(), password);
+      // Solo navegar si el login fue exitoso
       navigation.navigate('Home' as never);
     } catch (error: any) {
-      Alert.alert('Error de inicio de sesión', error.message || 'Credenciales incorrectas');
+      // Manejar errores específicos del backend
+      let errorMessage = 'Error de inicio de sesión';
+      
+      if (error.code === 'INVALID_CREDENTIALS') {
+        errorMessage = 'Credenciales inválidas, contraseña o usuario incorrectos';
+      } else if (error.code === 'USER_DISABLED') {
+        errorMessage = 'La cuenta ha sido deshabilitada';
+      } else if (error.code === 'TOO_MANY_REQUESTS') {
+        errorMessage = 'Demasiados intentos de login. Intenta más tarde';
+      } else if (error.code === 'VALIDATION_ERROR') {
+        errorMessage = 'Datos de login inválidos';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión a internet';
+      } else if (error.code === 'SERVICE_UNAVAILABLE') {
+        errorMessage = 'El servicio no está disponible. Intenta más tarde';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error de inicio de sesión', errorMessage);
+      // NO navegar en caso de error - quedarse en la pantalla de login
     }
   }, [emailOrUser, password, login, navigation]);
 

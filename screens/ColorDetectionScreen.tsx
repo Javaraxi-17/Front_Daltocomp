@@ -17,6 +17,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { colorDetectionService, ColorDetectionResult } from '../services/colorDetection';
 import { advancedColorDetectionService, AdvancedColorResult } from '../services/advancedColorDetection';
+import { googleAIService, ColorRecommendation } from '../services/googleAIService';
+import { colorDetectionWithBackendService } from '../services/colorDetectionWithBackend';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -32,6 +34,11 @@ export default function ColorDetectionScreen() {
   const [colorResult, setColorResult] = useState<ColorDetectionResult | null>(null);
   const [useAdvancedDetection, setUseAdvancedDetection] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [aiRecommendations, setAiRecommendations] = useState<ColorRecommendation[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [detectionId, setDetectionId] = useState<string | null>(null);
+  const [recommendationId, setRecommendationId] = useState<string | null>(null);
+  const [isSavingToBackend, setIsSavingToBackend] = useState(false);
   const cameraRef = useRef<CameraView | null>(null);
 
   useEffect(() => {
@@ -77,15 +84,27 @@ export default function ColorDetectionScreen() {
   const analyzeImage = async (imageUri: string) => {
     try {
       setIsAnalyzing(true);
-      console.log('🔍 Iniciando análisis de imagen:', imageUri);
+      setIsSavingToBackend(true);
+      console.log('🔍 Iniciando análisis de imagen con guardado en backend:', imageUri);
       
-      // Usar solo el servicio básico por ahora para evitar errores
-      const result = await colorDetectionService.detectColor(imageUri);
-      console.log('✅ Resultado del análisis:', result);
+      // Usar el servicio integrado que detecta y guarda en el backend
+      const result = await colorDetectionWithBackendService.detectAndSaveColors(imageUri);
+      console.log('✅ Resultado del análisis completo:', result);
       
-      if (result && result.dominantColor) {
-        setColorResult(result);
-        console.log('🎨 Color detectado:', result.dominantColor.name);
+      if (result.detectionResult && result.detectionResult.dominantColor) {
+        setColorResult(result.detectionResult);
+        setAiRecommendations(result.recommendations);
+        setDetectionId(result.detectionId || null);
+        setRecommendationId(result.recommendationId || null);
+        
+        console.log('🎨 Color detectado:', result.detectionResult.dominantColor.name);
+        console.log('💾 Guardado en backend - Detección ID:', result.detectionId);
+        console.log('💾 Guardado en backend - Recomendaciones ID:', result.recommendationId);
+        
+        // Mostrar mensaje de éxito si se guardó en el backend
+        if (result.detectionId || result.recommendationId) {
+          console.log('✅ Datos guardados exitosamente en el historial personal');
+        }
       } else {
         throw new Error('Resultado inválido del análisis');
       }
@@ -93,11 +112,34 @@ export default function ColorDetectionScreen() {
       console.error('❌ Error analizando imagen:', error);
       Alert.alert(
         'Error de Análisis', 
-        'No se pudo analizar la imagen. Esto puede deberse a problemas de procesamiento. Intenta con otra foto.',
+        'No se pudo analizar la imagen. Esto puede deberse a problemas de procesamiento o conexión. Intenta con otra foto.',
         [{ text: 'OK' }]
       );
     } finally {
       setIsAnalyzing(false);
+      setIsSavingToBackend(false);
+    }
+  };
+
+  const getAIRecommendations = async (colorName: string, colorCategory: string) => {
+    try {
+      setIsLoadingRecommendations(true);
+      console.log('🤖 Obteniendo recomendaciones de IA para:', colorName);
+      
+      const response = await googleAIService.getColorRecommendations(colorName, colorCategory);
+      
+      if (response.success && response.recommendations.length > 0) {
+        setAiRecommendations(response.recommendations);
+        console.log('✅ Recomendaciones obtenidas:', response.recommendations.length);
+      } else {
+        console.warn('⚠️ No se pudieron obtener recomendaciones:', response.error);
+        setAiRecommendations([]);
+      }
+    } catch (error) {
+      console.error('❌ Error obteniendo recomendaciones:', error);
+      setAiRecommendations([]);
+    } finally {
+      setIsLoadingRecommendations(false);
     }
   };
 
@@ -121,6 +163,9 @@ export default function ColorDetectionScreen() {
     setCapturedImage(null);
     setColorResult(null);
     setSelectedRegion(null);
+    setAiRecommendations([]);
+    setDetectionId(null);
+    setRecommendationId(null);
   };
 
   const retakePhoto = () => {
@@ -191,7 +236,7 @@ export default function ColorDetectionScreen() {
             <View style={styles.analyzingOverlay}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.analyzingText, { color: colors.text }]}>
-                Analizando colores...
+                {isSavingToBackend ? 'Analizando y guardando...' : 'Analizando colores...'}
               </Text>
             </View>
           )}
@@ -199,9 +244,16 @@ export default function ColorDetectionScreen() {
 
         {colorResult && (
           <View style={styles.resultsContainer}>
-            <Text style={[styles.resultsTitle, { color: colors.text }]}>
-              🎨 Color Detectado
-            </Text>
+            <View style={styles.resultsHeader}>
+              <Text style={[styles.resultsTitle, { color: colors.text }]}>
+                🎨 Color Detectado
+              </Text>
+              {(detectionId || recommendationId) && (
+                <Text style={[styles.savedIndicator, { color: colors.primary }]}>
+                  💾 Guardado en historial
+                </Text>
+              )}
+            </View>
             
             <View style={[styles.dominantColorCard, { backgroundColor: colors.card }]}>
               <View style={[styles.colorPreview, { backgroundColor: `rgb(${colorResult.rgb ? colorResult.rgb.join(',') : '128,128,128'})` }]} />
@@ -242,6 +294,49 @@ export default function ColorDetectionScreen() {
                 ))}
               </>
             )}
+
+            {/* Sección de Recomendaciones de IA */}
+            <View style={styles.recommendationsContainer}>
+              <Text style={[styles.recommendationsTitle, { color: colors.text }]}>
+                💡 Recomendaciones para Distinguir el Color
+              </Text>
+              
+              {isLoadingRecommendations ? (
+                <View style={styles.loadingRecommendations}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.mutedText }]}>
+                    Generando recomendaciones personalizadas...
+                  </Text>
+                </View>
+              ) : aiRecommendations.length > 0 ? (
+                aiRecommendations.map((recommendation, index) => (
+                  <View key={index} style={[styles.recommendationCard, { backgroundColor: colors.card }]}>
+                    <Text style={[styles.recommendationStrategy, { color: colors.text }]}>
+                      {recommendation.strategy}
+                    </Text>
+                    <Text style={[styles.recommendationDescription, { color: colors.mutedText }]}>
+                      {recommendation.description}
+                    </Text>
+                    {recommendation.tips.length > 0 && (
+                      <View style={styles.tipsContainer}>
+                        <Text style={[styles.tipsTitle, { color: colors.text }]}>Consejos prácticos:</Text>
+                        {recommendation.tips.map((tip, tipIndex) => (
+                          <Text key={tipIndex} style={[styles.tipItem, { color: colors.mutedText }]}>
+                            • {tip}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <View style={[styles.noRecommendationsCard, { backgroundColor: colors.card }]}>
+                  <Text style={[styles.noRecommendationsText, { color: colors.mutedText }]}>
+                    No se pudieron generar recomendaciones en este momento.
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
@@ -428,11 +523,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 20,
   },
+  resultsHeader: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
   resultsTitle: {
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: 16,
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  savedIndicator: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   dominantColorCard: {
     flexDirection: 'row',
@@ -556,5 +661,71 @@ const styles = StyleSheet.create({
   analysisValue: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Estilos para recomendaciones de IA
+  recommendationsContainer: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+  },
+  recommendationsTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  loadingRecommendations: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 12,
+  },
+  loadingText: {
+    marginLeft: 12,
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  recommendationCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  recommendationStrategy: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#4CAF50',
+  },
+  recommendationDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  tipsContainer: {
+    marginTop: 8,
+  },
+  tipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  tipItem: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  noRecommendationsCard: {
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  noRecommendationsText: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
