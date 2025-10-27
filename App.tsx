@@ -16,6 +16,8 @@ import D15TestScreen from './screens/D15TestScreen';
 import ColorDetectIntroScreen from './screens/ColorDetectIntroScreen';
 import CameraToolScreen from './screens/CameraToolScreen';
 import ColorDetectionScreen from './screens/ColorDetectionScreen';
+import EducationScreen from './screens/EducationScreen';
+import HistoryScreen from './screens/HistoryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -46,6 +48,22 @@ function RootStack() {
       <Stack.Screen name="ColorDetectIntro" component={ColorDetectIntroScreen} />
       <Stack.Screen name="CameraTool" component={CameraToolScreen} />
       <Stack.Screen name="ColorDetection" component={ColorDetectionScreen} />
+      <Stack.Screen 
+        name="Education" 
+        component={EducationScreen}
+        options={{
+          animation: 'fade',
+          animationDuration: 400,
+        }}
+      />
+      <Stack.Screen 
+        name="History" 
+        component={HistoryScreen}
+        options={{
+          animation: 'slide_from_right',
+          animationDuration: 300,
+        }}
+      />
     </Stack.Navigator>
   );
 }

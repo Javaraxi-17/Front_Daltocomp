@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../hooks/ThemeProvider';
 import { useAuth } from '../hooks/useAuth';
@@ -7,7 +7,7 @@ import { apiService } from '../services/api';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
-  const { colors } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
   const { user, logout, updateUser } = useAuth();
   
   // Estados para el modal de editar perfil
@@ -181,13 +181,23 @@ export default function ProfileScreen() {
           <Text style={[styles.optionText, { color: colors.text }]}>Editar perfil</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.optionButton, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => {}}>
-          <Text style={[styles.optionText, { color: colors.text }]}>Historial de pruebas</Text>
+        <TouchableOpacity style={[styles.optionButton, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => navigation.navigate('History' as never)}>
+          <Text style={[styles.optionText, { color: colors.text }]}>Historial de escaneos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.optionButton, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={handleChangePassword}>
           <Text style={[styles.optionText, { color: colors.text }]}>Cambiar contraseña</Text>
         </TouchableOpacity>
+
+        <View style={[styles.optionButton, { backgroundColor: colors.card, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <Text style={[styles.optionText, { color: colors.text }]}>Modo oscuro</Text>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            thumbColor={isDark ? '#ffffff' : undefined}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+          />
+        </View>
 
         <TouchableOpacity 
           style={[styles.logoutButton, { backgroundColor: colors.card }]} 

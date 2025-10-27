@@ -93,6 +93,8 @@ export interface ColorHistoryResponse {
     updatedAt: string;
   }>;
   total: number;
+  hasMore: boolean;
+  lastDocId: string | null;
   message: string;
 }
 
@@ -112,6 +114,8 @@ export interface RecommendationHistoryResponse {
     updatedAt: string;
   }>;
   total: number;
+  hasMore: boolean;
+  lastDocId: string | null;
   message: string;
 }
 
@@ -125,6 +129,15 @@ class ApiService {
 
   setToken(token: string | null) {
     this.token = token;
+    console.log('🔐 Token actualizado:', token ? `${token.substring(0, 20)}...` : 'null');
+  }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  isTokenValid(): boolean {
+    return !!this.token;
   }
 
   private async request<T>(
@@ -140,6 +153,9 @@ class ApiService {
 
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`;
+      console.log(`🔐 Token configurado: ${this.token.substring(0, 20)}...`);
+    } else {
+      console.log('⚠️ No hay token configurado');
     }
 
     console.log(`🌐 API Request: ${options.method || 'GET'} ${url}`);
@@ -155,6 +171,12 @@ class ApiService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('❌ API Error:', errorData);
+        
+        // Si es un error 401, el token puede estar expirado
+        if (response.status === 401) {
+          console.log('🔐 Token expirado o inválido, limpiando...');
+          this.setToken(null);
+        }
         
         // Crear un error personalizado que preserve el código y mensaje del backend
         const error = new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
@@ -256,12 +278,20 @@ class ApiService {
     });
   }
 
-  async getColorDetectionHistory(limit: number = 20, offset: number = 0): Promise<ColorHistoryResponse> {
-    return this.request<ColorHistoryResponse>(`/color-detection/history?limit=${limit}&offset=${offset}`);
+  async getColorDetectionHistory(limit: number = 20, lastDocId?: string): Promise<ColorHistoryResponse> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (lastDocId) {
+      params.append('lastDocId', lastDocId);
+    }
+    return this.request<ColorHistoryResponse>(`/color-detection/history?${params.toString()}`);
   }
 
-  async getRecommendationHistory(limit: number = 20, offset: number = 0): Promise<RecommendationHistoryResponse> {
-    return this.request<RecommendationHistoryResponse>(`/color-detection/recommendations/history?limit=${limit}&offset=${offset}`);
+  async getRecommendationHistory(limit: number = 20, lastDocId?: string): Promise<RecommendationHistoryResponse> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (lastDocId) {
+      params.append('lastDocId', lastDocId);
+    }
+    return this.request<RecommendationHistoryResponse>(`/color-detection/recommendations/history?${params.toString()}`);
   }
 
   async getColorDetectionById(id: string): Promise<{ success: boolean; detection: any; message: string }> {
@@ -270,6 +300,12 @@ class ApiService {
 
   async deleteColorDetection(id: string): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>(`/color-detection/detection/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteRecommendation(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/color-detection/recommendation/${id}`, {
       method: 'DELETE',
     });
   }

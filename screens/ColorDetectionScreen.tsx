@@ -19,6 +19,7 @@ import { colorDetectionService, ColorDetectionResult } from '../services/colorDe
 import { advancedColorDetectionService, AdvancedColorResult } from '../services/advancedColorDetection';
 import { googleAIService, ColorRecommendation } from '../services/googleAIService';
 import { colorDetectionWithBackendService } from '../services/colorDetectionWithBackend';
+import { apiService } from '../services/api';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 

@@ -191,15 +191,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshAuth = async () => {
     try {
-      if (!token) return;
+      if (!token) {
+        console.log('⚠️ No hay token para refrescar');
+        return;
+      }
       
+      console.log('🔄 Refrescando autenticación...');
       const userData = await apiService.getCurrentUser();
       setUser(userData);
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
-    } catch (error) {
-      console.error('Refresh auth error:', error);
-      // Si falla la verificación, hacer logout
-      await logout();
+      console.log('✅ Autenticación refrescada exitosamente');
+    } catch (error: any) {
+      console.error('❌ Refresh auth error:', error);
+      
+      // Si es un error de token expirado o inválido, hacer logout
+      if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN' || error.status === 401) {
+        console.log('🔐 Token expirado, haciendo logout...');
+        await logout();
+      }
     }
   };
 
