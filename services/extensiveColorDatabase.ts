@@ -301,25 +301,72 @@ export class ExtensiveColorMatcher {
   }
 
   /**
-   * Calcula la distancia entre dos colores usando algoritmo avanzado
+   * Calcula la distancia entre dos colores usando algoritmo avanzado mejorado
    */
   private calculateAdvancedDistance(rgb1: [number, number, number], rgb2: [number, number, number]): number {
     const [r1, g1, b1] = rgb1;
     const [r2, g2, b2] = rgb2;
     
-    // Algoritmo de distancia euclidiana mejorado con pesos
+    // Convertir a HSL para mejor comparación perceptual
+    const hsl1 = this.rgbToHsl(r1, g1, b1);
+    const hsl2 = this.rgbToHsl(r2, g2, b2);
+    
+    // Distancia en espacio HSL (más perceptualmente uniforme)
+    const deltaH = Math.min(Math.abs(hsl1[0] - hsl2[0]), 360 - Math.abs(hsl1[0] - hsl2[0]));
+    const deltaS = Math.abs(hsl1[1] - hsl2[1]);
+    const deltaL = Math.abs(hsl1[2] - hsl2[2]);
+    
+    // Peso diferente para cada componente HSL
+    const hueWeight = 2.0;      // El matiz es muy importante
+    const saturationWeight = 1.5; // La saturación es importante
+    const lightnessWeight = 1.0;  // La luminosidad es importante
+    
+    // Distancia euclidiana en espacio HSL
+    const hslDistance = Math.sqrt(
+      hueWeight * deltaH * deltaH +
+      saturationWeight * deltaS * deltaS +
+      lightnessWeight * deltaL * deltaL
+    );
+    
+    // También calcular distancia RGB para colores muy similares
     const deltaR = r1 - r2;
     const deltaG = g1 - g2;
     const deltaB = b1 - b2;
     
-    // Peso diferente para cada canal (el ojo humano es más sensible a ciertos colores)
-    const weightedDistance = Math.sqrt(
-      (2 + (r1 + r2) / 512) * deltaR * deltaR +
-      4 * deltaG * deltaG +
-      (2 + (255 - (r1 + r2)) / 512) * deltaB * deltaB
+    // Peso diferente para cada canal RGB (el ojo humano es más sensible al verde)
+    const rgbDistance = Math.sqrt(
+      0.3 * deltaR * deltaR +
+      0.6 * deltaG * deltaG +
+      0.1 * deltaB * deltaB
     );
     
-    return weightedDistance;
+    // Combinar ambas distancias con pesos
+    const combinedDistance = 0.7 * hslDistance + 0.3 * rgbDistance;
+    
+    return combinedDistance;
+  }
+
+  /**
+   * Convierte RGB a HSL
+   */
+  private rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+    
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    
+    return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   }
 
   /**

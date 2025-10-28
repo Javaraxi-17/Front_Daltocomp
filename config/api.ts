@@ -4,7 +4,7 @@ export const API_CONFIG = {
   LOCAL: 'http://localhost:4000',
   
   // Para desarrollo con dispositivo físico o emulador en red
-  NETWORK: 'http://192.168.1.5:4000',
+  NETWORK: 'http://172.22.181.109:4000',
   
   // Para producción (cuando despliegues en un servidor)
   PRODUCTION: 'https://tu-servidor.com/api'

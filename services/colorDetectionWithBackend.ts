@@ -1,6 +1,8 @@
 import { colorDetectionService, type ColorDetectionResult } from './colorDetection';
 import { googleAIService, type ColorRecommendation } from './googleAIService';
 import { apiService, type ColorDetectionData, type RecommendationData } from './api';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { extensiveColorMatcher } from './extensiveColorDatabase';
 
 /**
  * Servicio que integra la detección local de colores con el guardado en el backend
@@ -18,9 +20,53 @@ export class ColorDetectionWithBackendService {
     try {
       console.log('🎨 Iniciando detección y guardado de colores...');
       
-      // 1. Detectar colores localmente
-      const detectionResult = await colorDetectionService.detectColor(imageUri);
-      console.log('✅ Color detectado localmente:', detectionResult.dominantColor.name);
+      // 1. Intentar detección precisa en backend (con redimensionamiento previo)
+      let detectionResult: ColorDetectionResult | null = null;
+      try {
+        const resized = await manipulateAsync(
+          imageUri,
+          [{ resize: { width: 224 } }], // baja resolución para estabilizar colores
+          { compress: 0.75, format: SaveFormat.JPEG, base64: true }
+        );
+        if (!resized.base64) throw new Error('No se pudo generar base64 de la imagen');
+        const analyze = await apiService.analyzeImageBase64(resized.base64, { maxColors: 5, resize: { maxWidth: 224, maxHeight: 224 } });
+
+        const rgb = analyze.analysis.dominantColor.rgb;
+        const closest = extensiveColorMatcher.findClosestColor(rgb);
+
+        const palette = analyze.analysis.palette.slice(0, 4).map(p => {
+          const closestPal = extensiveColorMatcher.findClosestColor(p.rgb);
+          return {
+            name: closestPal.color.name,
+            category: closestPal.color.category,
+            rgb: p.rgb as [number, number, number],
+            percentage: p.percentage,
+          };
+        });
+
+        detectionResult = {
+          dominantColor: {
+            name: closest.color.name,
+            category: closest.color.category,
+            rgb: rgb as [number, number, number],
+            confidence: analyze.analysis.dominantColor.confidence,
+          },
+          palette,
+          hex: analyze.analysis.dominantColor.hex,
+          rgb: rgb as [number, number, number],
+          hsl: analyze.analysis.dominantColor.hsl,
+        };
+
+        console.log('✅ Color detectado por backend:', detectionResult.dominantColor.name);
+      } catch (e) {
+        console.warn('⚠️ Fallback a detección local por error de backend:', e);
+      }
+
+      // 1b. Fallback a local si backend falló
+      if (!detectionResult) {
+        detectionResult = await colorDetectionService.detectColor(imageUri);
+        console.log('✅ Color detectado localmente:', detectionResult.dominantColor.name);
+      }
       
       // 2. Guardar detección en el backend
       let detectionId: string | undefined;

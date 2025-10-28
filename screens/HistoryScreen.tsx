@@ -100,15 +100,47 @@ export default function HistoryScreen() {
       ]);
 
       if (detectionsResponse.success) {
-        setDetections(detectionsResponse.colorHistory || []);
-        console.log('✅ Escaneos cargados:', detectionsResponse.colorHistory?.length || 0);
-        console.log('📊 Datos de escaneos:', detectionsResponse.colorHistory);
+        const normalizedDetections: ColorDetection[] = (detectionsResponse.colorHistory || []).map((doc: any) => {
+          const rgb = Array.isArray(doc.rgb) && doc.rgb.length === 3 ? doc.rgb : [128, 128, 128];
+          const hsl = Array.isArray(doc.hsl) && doc.hsl.length === 3 ? doc.hsl : [0, 0, 50];
+          const palette = Array.isArray(doc.palette) ? doc.palette.map((p: any) => ({
+            name: p?.name ?? 'Desconocido',
+            category: p?.category ?? 'Desconocido',
+            rgb: Array.isArray(p?.rgb) && p.rgb.length === 3 ? p.rgb : [128, 128, 128],
+            percentage: typeof p?.percentage === 'number' ? p.percentage : 0,
+          })) : undefined;
+          return {
+            id: String(doc.id ?? doc._id ?? ''),
+            colorName: String(doc.colorName ?? 'Desconocido'),
+            colorCategory: String(doc.colorCategory ?? 'Desconocido'),
+            rgb: rgb as [number, number, number],
+            hex: typeof doc.hex === 'string' ? doc.hex : '#808080',
+            hsl: hsl as [number, number, number],
+            confidence: typeof doc.confidence === 'number' ? Math.round(doc.confidence) : 50,
+            palette,
+            createdAt: typeof doc.createdAt === 'string' ? doc.createdAt : (doc.updatedAt ?? new Date().toISOString()),
+          } as ColorDetection;
+        });
+        setDetections(normalizedDetections);
+        console.log('✅ Escaneos cargados:', normalizedDetections.length);
+        console.log('📊 Datos de escaneos (normalizados):', normalizedDetections);
       }
 
       if (recommendationsResponse.success) {
-        setRecommendations(recommendationsResponse.recommendationHistory || []);
-        console.log('✅ Recomendaciones cargadas:', recommendationsResponse.recommendationHistory?.length || 0);
-        console.log('📊 Datos de recomendaciones:', recommendationsResponse.recommendationHistory);
+        const normalizedRecs: Recommendation[] = (recommendationsResponse.recommendationHistory || []).map((doc: any) => ({
+          id: String(doc.id ?? doc._id ?? ''),
+          colorName: String(doc.colorName ?? 'Desconocido'),
+          colorCategory: String(doc.colorCategory ?? 'Desconocido'),
+          recommendations: Array.isArray(doc.recommendations) ? doc.recommendations.map((r: any) => ({
+            strategy: String(r?.strategy ?? 'Sugerencia'),
+            description: String(r?.description ?? ''),
+            tips: Array.isArray(r?.tips) ? r.tips.map((t: any) => String(t)) : [],
+          })) : [],
+          createdAt: typeof doc.createdAt === 'string' ? doc.createdAt : (doc.updatedAt ?? new Date().toISOString()),
+        }));
+        setRecommendations(normalizedRecs);
+        console.log('✅ Recomendaciones cargadas:', normalizedRecs.length);
+        console.log('📊 Datos de recomendaciones (normalizados):', normalizedRecs);
       }
     } catch (error: any) {
       console.error('❌ Error loading history:', error);

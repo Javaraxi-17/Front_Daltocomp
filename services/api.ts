@@ -72,6 +72,20 @@ export interface SaveRecommendationsResponse {
   message: string;
 }
 
+// Analyze image (backend precise)
+export interface AnalyzeImageResponse {
+  success: boolean;
+  analysis: {
+    dominantColor: {
+      rgb: [number, number, number];
+      hex: string;
+      hsl: [number, number, number];
+      confidence: number;
+    };
+    palette: Array<{ rgb: [number, number, number]; hex: string; percentage: number }>;
+  };
+}
+
 export interface ColorHistoryResponse {
   success: boolean;
   colorHistory: Array<{
@@ -268,6 +282,13 @@ class ApiService {
     return this.request<SaveDetectionResponse>('/color-detection/save-detection', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async analyzeImageBase64(imageBase64: string, opts?: { maxColors?: number; resize?: { maxWidth?: number; maxHeight?: number } }): Promise<AnalyzeImageResponse> {
+    return this.request<AnalyzeImageResponse>('/color-detection/analyze-image/base64', {
+      method: 'POST',
+      body: JSON.stringify({ imageBase64, maxColors: opts?.maxColors, resize: opts?.resize }),
     });
   }
 
